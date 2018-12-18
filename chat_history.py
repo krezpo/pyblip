@@ -25,8 +25,12 @@ r.encoding = 'utf-8'
 if r.status_code != 200:
     print("An error has occurred, please verify.")
     print("HTTP STATUS CODE: {}".format(r.status_code))
+
 else:
-    print("{}".format(r.text))
+
+    contacts = [i['identity'] for i in r.json()['resource']['items']]
+
+    print(contacts)
 
 # TO-DO:
     # Format Threads
