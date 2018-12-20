@@ -4,6 +4,9 @@ import requests
 import json
 import yaml
 import sys
+import pandas as pd
+
+from dateutil import parser
 
 with open("config.yml", 'r') as stream:
     try:
@@ -30,6 +33,13 @@ else:
 
     contacts = [i['identity'] for i in r.json()['resource']['items']]
 
+excel = {'User': [],
+         'Day': [],
+         'Hour': [],
+         'From': [],
+         'To': [],
+         'Message': []}
+
 
 for c in contacts:
     payload['uri'] = "{}/{}?$take={}".format(data['uri'], c, data['messages'])
@@ -39,28 +49,41 @@ for c in contacts:
     if r.status_code != 200:
         print("IMPOSSIBLE TO GET MESSAGES FOR {}".format(c))
     else:
-        conversation = {}
+        try:
+            conversation = {}
     
-        conversation['contact'] = c
-        conversation['total'] = r.json()['resource']['total']
-        conversation['items'] = r.json()['resource']['items']
+            conversation['contact'] = c
+            conversation['total'] = r.json()['resource']['total']
+            conversation['items'] = r.json()['resource']['items']
 
-        print("\\\\----------------------------------")
-        print(". URL: {}".format(r.url))
-        print(". URI: {}".format(payload['uri']))
-        print(". HTTP Status Code: {}".format(r.status_code))
-        print(". Contact: {}".format(conversation['contact']))
-        print(". Total of exchanged messages: {}".format(conversation['total']))
-        print("")
+            print("\\\\----------------------------------")
+            print(". URL: {}".format(r.url))
+            print(". URI: {}".format(payload['uri']))
+            print(". HTTP Status Code: {}".format(r.status_code))
+            print(". Contact: {}".format(conversation['contact']))
+            print(". Total of exchanged messages: {}".format(conversation['total']))
+            print("")
     
-        print("{}\t{}\t{}\t{}".format("From", "To", "Timestamp", "Message"))
-        for i in conversation['items']:
-            if i['direction'] == 'sent':
-                print("{}\t{}\t{}\t{}".format("Bot", conversation['contact'], i['date'], i['content']))
-            else:
-                print("{}\t{}\t{}\t{}".format(conversation['contact'], "Bot", i['date'], i['content']))
+            for i in conversation['items']:
+                dt = parser.parse(i['date'])
+            
+                excel['User'].append(conversation['contact'])
+                excel['Day'].append(dt.strftime('%d/%-m/%-y'))
+                excel['Hour'].append(dt.strftime('%H:%M:%S.%f')[:-4])
+                excel['Message'].append(i['content'])
+            
+                if i['direction'] == 'sent':
+                    excel['From'].append('Bot')
+                    excel['To'].append('User')
+                else:
+                    excel['From'].append('User')
+                    excel['To'].append('Bot')
 
-        print("")
+        except Exception as e:
+            print("Error: {}".format(e))
 
-# TO-DO:
-    # Save conversations in an excel
+df = pd.DataFrame(excel, columns = [*excel])
+writer = pd.ExcelWriter('chat_history.xlsx')
+df.to_excel(writer, 'history', index=False)
+writer.save()
+print("Process Finished")
